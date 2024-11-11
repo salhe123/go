@@ -1,0 +1,33 @@
+table:
+  name: events
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        organizer_id:
+          _eq: X-Hasura-User-Id
+      columns: []
+    comment: ""
+select_permissions:
+  - role: user
+    permission:
+      columns: []
+      filter: {}
+    comment: ""
+update_permissions:
+  - role: user
+    permission:
+      columns: []
+      filter:
+        organizer_id:
+          _eq: X-Hasura-User-Id
+      check: null
+    comment: ""
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        organizer_id:
+          _eq: X-Hasura-User-Id
+    comment: ""

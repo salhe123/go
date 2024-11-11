@@ -1,0 +1,51 @@
+type Mutation {
+  image_upload(
+    arg1: ImageUploadInput!
+  ): ImageUploadOutput
+}
+
+type Mutation {
+  login(
+    arg1: LoginInput!
+  ): LoginOutput
+}
+
+type Mutation {
+  signup(
+    arg1: SignupInput!
+  ): SignupOutput
+}
+
+input SignupInput {
+  first_name: String!
+  last_name: String!
+  email: String!
+  password: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input ImageUploadInput {
+  file: String!
+  user_id: ID
+}
+
+type SignupOutput {
+  id: ID!
+  message: String
+}
+
+type LoginOutput {
+  id: ID!
+  token: String
+  message: String
+}
+
+type ImageUploadOutput {
+  url: String!
+  message: String
+}
+

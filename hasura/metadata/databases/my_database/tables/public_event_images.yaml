@@ -1,0 +1,29 @@
+table:
+  name: event_images
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        event_id:
+          _in:
+            - SELECT id FROM events WHERE organizer_id = X-Hasura-User-Id
+      columns: []
+    comment: ""
+select_permissions:
+  - role: user
+    permission:
+      columns: []
+      filter:
+        event_id:
+          _in:
+            - SELECT id FROM events WHERE organizer_id = X-Hasura-User-Id
+    comment: ""
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        event_id:
+          _in:
+            - SELECT id FROM events WHERE organizer_id = X-Hasura-User-Id
+    comment: ""

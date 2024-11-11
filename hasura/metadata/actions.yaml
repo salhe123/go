@@ -1,0 +1,27 @@
+actions:
+  - name: image_upload
+    definition:
+      kind: synchronous
+      handler: http://localhost:7070/api/image_upload
+    comment: image_upload
+  - name: login
+    definition:
+      kind: synchronous
+      handler: http://localhost:7070/api/login
+    comment: login
+  - name: signup
+    definition:
+      kind: synchronous
+      handler: http://localhost:7070/api/signup
+    comment: signup
+custom_types:
+  enums: []
+  input_objects:
+    - name: SignupInput
+    - name: LoginInput
+    - name: ImageUploadInput
+  objects:
+    - name: SignupOutput
+    - name: LoginOutput
+    - name: ImageUploadOutput
+  scalars: []
