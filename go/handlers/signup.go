@@ -3,193 +3,129 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
-	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// ActionPayload structure to handle the input from the Hasura Action
-type ActionPayload struct {
-	SessionVariables map[string]interface{} `json:"session_variables"`
-	Input            signupArgs             `json:"input"`
-}
-
-// signupArgs represents the data we expect from the signup action
-type signupArgs struct {
+// Define the user input data structure matching Hasura's SignupInput
+type SignupInput struct {
+	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
 	Password  string `json:"password"`
 }
 
-// SignupOutput represents the response that will be sent back to Hasura
+// GraphQL request structure
+type GraphQLRequest struct {
+	Query     string      `json:"query"`
+	Variables interface{} `json:"variables"`
+}
+
+// Define the expected structure for Hasura's SignupOutput
 type SignupOutput struct {
-	Id      string `json:"id"`
+	ID      string `json:"id"`
 	Message string `json:"message"`
 }
 
-// GraphQLError structure to return error messages
-type GraphQLErr struct {
-	Message string `json:"message"`
+// Define a structure to match Hasura's GraphQL response
+type GraphQLResponse struct {
+	Data struct {
+		Signup SignupOutput `json:"signup"`
+	} `json:"data"`
 }
 
-// Load environment variables from .env file
-func loadEnvVars() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Error loading .env file")
+// SignupHandler to handle the signup mutation
+func SignupHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse the request JSON into SignupInput struct
+	var input SignupInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
 	}
-}
+	log.Printf("Received Signup request: %+v\n", input)
 
-// hashPassword hashes the password using bcrypt
-func hashPassword(password string) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
 	}
-	return string(hashedPassword), nil
-}
+	input.Password = string(hashedPassword)
 
-// performHasuraMutation sends a mutation request to Hasura's GraphQL endpoint
-func performHasuraMutation(user signupArgs) (SignupOutput, error) {
-	// Get GraphQL API URL and Hasura admin secret from environment variables
-	hasuraURL := os.Getenv("HASURA_GRAPHQL_ENDPOINT")
-	hasuraSecret := os.Getenv("HASURA_GRAPHQL_ADMIN_SECRET")
-
-	// Construct the mutation for Hasura to insert the user
+	// GraphQL mutation with variables
 	mutation := `
-	mutation($first_name: String!, $last_name: String!, $email: String!, $password: String!) {
-	  insert_users_one(object: {
-	    first_name: $first_name,
-	    last_name: $last_name,
-	    email: $email,
-	    password: $password
-	  }) {
-	    id
-	    first_name
-	    last_name
-	    email
-	  }
-	}
-	`
+        mutation Signup($email: String!, $first_name: String!, $last_name: String!, $password: String!) {
+            signup(arg1: {email: $email, first_name: $first_name, last_name: $last_name, password: $password}) {
+                id
+                message
+            }
+        }
+    `
 
-	// Prepare the variables for the mutation
-	variables := map[string]interface{}{
-		"first_name": user.FirstName,
-		"last_name":  user.LastName,
-		"email":      user.Email,
-		"password":   user.Password, // Already hashed password
+	// Prepare GraphQL request payload
+	requestPayload := GraphQLRequest{
+		Query: mutation,
+		Variables: map[string]interface{}{
+			"email":      input.Email,
+			"first_name": input.FirstName,
+			"last_name":  input.LastName,
+			"password":   input.Password,
+		},
 	}
 
-	// Prepare the GraphQL request body
-	requestBody := map[string]interface{}{
-		"query":     mutation,
-		"variables": variables,
-	}
-
-	// Encode the request body to JSON
-	requestBodyJSON, err := json.Marshal(requestBody)
+	jsonData, err := json.Marshal(requestPayload)
 	if err != nil {
-		return SignupOutput{}, err
+		http.Error(w, "Failed to serialize payload", http.StatusInternalServerError)
+		return
 	}
 
-	// Send the request to the Hasura GraphQL endpoint
-	req, err := http.NewRequest("POST", hasuraURL, bytes.NewBuffer(requestBodyJSON))
+	// Use environment variables for sensitive information
+	endpoint := os.Getenv("HASURA_GRAPHQL_ENDPOINT")
+	adminSecret := os.Getenv("HASURA_GRAPHQL_ADMIN_SECRET")
+
+	// Send the HTTP request to Hasura
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return SignupOutput{}, err
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		return
 	}
 
-	// Set the authorization header with the Hasura secret
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-hasura-admin-secret", hasuraSecret)
+	req.Header.Set("x-hasura-admin-secret", adminSecret)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return SignupOutput{}, err
+		http.Error(w, "Request to Hasura failed", http.StatusInternalServerError)
+		return
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
-	responseBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return SignupOutput{}, err
-	}
-
-	// Check if the response contains an error
 	if resp.StatusCode != http.StatusOK {
-		return SignupOutput{}, fmt.Errorf("Hasura responded with error: %s", responseBody)
-	}
-
-	// Parse the response from Hasura
-	var response map[string]interface{}
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return SignupOutput{}, err
-	}
-
-	// Extract the user ID from the response
-	userData := response["data"].(map[string]interface{})["insert_users_one"].(map[string]interface{})
-	userID := userData["id"].(string)
-
-	// Return the result
-	return SignupOutput{
-		Id:      userID,
-		Message: "User successfully created",
-	}, nil
-}
-
-// handler processes the signup request
-func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	// Set the response header as JSON
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("mmmmmmmmmmmmmmmmmmmmmmm")
-
-	// Read request body
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+		http.Error(w, "Non-200 response from Hasura", http.StatusInternalServerError)
 		return
 	}
 
-	// Parse the body as Action payload
-	var actionPayload ActionPayload
-	err = json.Unmarshal(reqBody, &actionPayload)
-	if err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+	// Parse the GraphQL response and log it
+	var result GraphQLResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		http.Error(w, "Failed to decode response", http.StatusInternalServerError)
 		return
 	}
 
-	// Hash the password before sending it to Hasura
-	hashedPassword, err := hashPassword(actionPayload.Input.Password)
-	if err != nil {
-		http.Error(w, "Error hashing password", http.StatusInternalServerError)
+	// Log the Hasura response for debugging
+	log.Printf("Hasura response: %+v\n", result)
+
+	// Check if the response is empty
+	if result.Data.Signup.ID == "" {
+		http.Error(w, "Signup mutation failed", http.StatusInternalServerError)
 		return
 	}
 
-	// Replace the plain password with the hashed password
-	actionPayload.Input.Password = hashedPassword
-
-	// Send the request params to the Hasura mutation
-	result, err := performHasuraMutation(actionPayload.Input)
-
-	// Throw if an error happens
-	if err != nil {
-		errorObject := GraphQLError{
-			Message: err.Error(),
-		}
-		errorBody, _ := json.Marshal(errorObject)
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write(errorBody)
-		return
-	}
-
-	// Write the response as JSON
-	data, _ := json.Marshal(result)
-	w.Write(data)
+	// Send the signup response back to the client
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(result.Data.Signup)
 }

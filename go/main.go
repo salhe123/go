@@ -20,8 +20,8 @@ func main() {
 	http.HandleFunc("/api/login", handlers.LoginHandler)
 
 	// Start the server on port 7070
-	log.Println("Starting server on port 7070...")
-	err = http.ListenAndServe(":7070", nil)
+	log.Println("Starting server on port 5000...")
+	err = http.ListenAndServe(":5000", nil)
 	if err != nil {
 		log.Fatalf("Could not start server: %s", err)
 	}

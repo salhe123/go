@@ -7,7 +7,14 @@ insert_permissions:
       check:
         id:
           _eq: X-Hasura-User-Id
-      columns: []
+      columns:
+        - email
+        - first_name
+        - last_name
+        - password
+        - id
+        - created_at
+        - updated_at
     comment: ""
 select_permissions:
   - role: user

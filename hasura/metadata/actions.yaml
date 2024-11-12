@@ -12,7 +12,9 @@ actions:
   - name: signup
     definition:
       kind: synchronous
-      handler: http://localhost:7070/api/signup
+      handler: http://127.0.0.1:5000/api/signup
+    permissions:
+      - role: user
     comment: signup
 custom_types:
   enums: []
