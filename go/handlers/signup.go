@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
@@ -27,7 +26,8 @@ type GraphQLRequest struct {
 }
 
 type GraphQLData struct {
-	Signup signupOutput `json:"signup"` // Update to match the mutation name
+	Insert_user_one signupOutput `json:"insert_user_one"`
+	User            []userOutput `json:"user"` // Changed to array
 }
 
 type GraphQLResponse struct {
@@ -41,24 +41,34 @@ type signupArgs struct {
 	Password string `json:"password"`
 }
 
-type signupOutput struct {
-	ID string `json:"id"` // This corresponds to the `id` returned by the mutation
+type loginArgs struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
-// SignupHandler is the HTTP handler for the signup action
+type signupOutput struct {
+	ID string `json:"id"`
+}
+
+type userOutput struct {
+	ID       string `json:"id"`
+	Password string `json:"password"`
+	Role     string `json:"role"` // Add role here
+}
+
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	log.Println("mmmmmmmmmmmm")
+
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
 	var actionPayload ActionPayload
 	err = json.Unmarshal(reqBody, &actionPayload)
 	if err != nil {
-		http.Error(w, "Invalid payload", http.StatusBadRequest)
+		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
@@ -77,99 +87,92 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// signup handles the business logic for user signup
 func signup(args signupArgs) (response signupOutput, err error) {
-	// Hash the password before saving to the database
-	log.Println("signuphandles")
 	hashedPassword, err := hashPassword(args.Password)
 	if err != nil {
-		return signupOutput{}, err
+		return
 	}
 
-	// Define variables for the GraphQL mutation
 	variables := map[string]interface{}{
+		"username": args.Username,
 		"email":    args.Email,
 		"password": hashedPassword,
-		"username": args.Username,
 	}
 
-	// Perform the GraphQL mutation to insert a new user
 	hasuraResponse, err := executeSignup(variables)
 	if err != nil {
-		return signupOutput{}, err
+		return
 	}
 
 	if len(hasuraResponse.Errors) != 0 {
 		err = errors.New(hasuraResponse.Errors[0].Message)
-		return signupOutput{}, err
+		return
 	}
 
-	// Prepare the response with the user ID
-	response = signupOutput{
-		ID: hasuraResponse.Data.Signup.ID,
-	}
-
-	return response, nil
+	response = hasuraResponse.Data.Insert_user_one
+	return
 }
 
-// executeSignup executes the GraphQL mutation to insert a new user
 func executeSignup(variables map[string]interface{}) (response GraphQLResponse, err error) {
-	log.Println("signup data", variables)
-	query := `mutation MyMutation($email: String!, $password: String!, $username: String!) {
-        signup(input: {email: $email, password: $password, username: $username}) {
-            id  
+	// GraphQL query
+	query := `mutation ($username: String!, $email: String!, $password: String!) {
+        signup(input: {username: $username, email: $email, password: $password}) {
+            id
         }
     }`
 
+	// Prepare request body
 	reqBody := GraphQLRequest{
 		Query:     query,
 		Variables: variables,
 	}
 	reqBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return GraphQLResponse{}, err
-	}
-	log.Println(reqBody)
-	// Set the admin secret in the headers
-	adminSecret := "ibnuseid27" // Replace with your actual admin secret
-	req, err := http.NewRequest("POST", "http://localhost:8080/v1/graphql", bytes.NewBuffer(reqBytes))
-	if err != nil {
-		return GraphQLResponse{}, err
+		return
 	}
 
-	// Add the X-Hasura-Admin-Secret header
+	// Admin secret for authentication
+	adminSecret := "ibnuseid27" // Replace this with your actual admin secret
+
+	// Create the HTTP request
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1/graphql", bytes.NewBuffer(reqBytes))
+	if err != nil {
+		return
+	}
+
+	// Set required headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Hasura-Admin-Secret", adminSecret)
 
-	// Make the HTTP request
+	// Perform the HTTP request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return GraphQLResponse{}, err
+		return
 	}
 	defer resp.Body.Close()
 
-	// Read the response from Hasura
+	// Read and process the response
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return GraphQLResponse{}, err
+		return
 	}
 
+	// Check if the status code is OK
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("failed to execute GraphQL query: %s", string(respBytes))
-		return GraphQLResponse{}, err
+		return
 	}
 
-	// Parse the response body
+	// Unmarshal the response body
 	err = json.Unmarshal(respBytes, &response)
 	if err != nil {
-		return GraphQLResponse{}, err
+		return
 	}
 
-	return response, nil
+	return
 }
 
-// hashPassword hashes a user's password using bcrypt
 func hashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {

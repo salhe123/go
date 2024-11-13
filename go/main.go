@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/mux" // Import the mux package here
 	"github.com/joho/godotenv"
 )
 
@@ -15,13 +16,15 @@ func main() {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
+	router := mux.NewRouter() // Initialize the router using mux
+
 	// Initialize your handlers
-	http.HandleFunc("/api/signup", handlers.SignupHandler)
+	router.HandleFunc("/api/signup", handlers.SignupHandler).Methods("POST")
 	// http.HandleFunc("/api/login", handlers.LoginHandler)
 
-	// Start the server on port 7070
+	// Start the server on port 5000
 	log.Println("Starting server on port 5000...")
-	err = http.ListenAndServe(":5000", nil)
+	err = http.ListenAndServe(":5000", router) // Use the router here
 	if err != nil {
 		log.Fatalf("Could not start server: %s", err)
 	}
