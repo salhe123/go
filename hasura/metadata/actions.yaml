@@ -7,14 +7,12 @@ actions:
   - name: login
     definition:
       kind: synchronous
-      handler: http://localhost:7070/api/login
+      handler: http://192.168.70.42:5000/api/login
     comment: login
   - name: signup
     definition:
       kind: synchronous
-      handler: http://127.0.0.1:5000/api/signup
-    permissions:
-      - role: user
+      handler: http://192.168.70.42:5000/api/signup
     comment: signup
 custom_types:
   enums: []
@@ -22,8 +20,10 @@ custom_types:
     - name: SignupInput
     - name: LoginInput
     - name: ImageUploadInput
+    - name: signupArgs
   objects:
     - name: SignupOutput
     - name: LoginOutput
     - name: ImageUploadOutput
+    - name: signupOutput
   scalars: []

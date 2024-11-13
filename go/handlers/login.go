@@ -29,7 +29,7 @@ type LoginOutput struct {
 }
 
 // GraphQLError struct for handling error from Hasura
-type GraphQLError struct {
+type GraphQLEr struct {
 	Message string `json:"message"`
 }
 

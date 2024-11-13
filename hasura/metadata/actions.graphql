@@ -12,8 +12,8 @@ type Mutation {
 
 type Mutation {
   signup(
-    arg1: SignupInput!
-  ): SignupOutput
+    input: signupArgs!
+  ): signupOutput
 }
 
 input SignupInput {
@@ -33,6 +33,12 @@ input ImageUploadInput {
   user_id: ID
 }
 
+input signupArgs {
+  username: String!
+  email: String!
+  password: String!
+}
+
 type SignupOutput {
   id: ID!
   message: String
@@ -47,5 +53,10 @@ type LoginOutput {
 type ImageUploadOutput {
   url: String!
   message: String
+}
+
+type signupOutput {
+  id: String!
+  message: String!
 }
 

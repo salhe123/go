@@ -17,7 +17,7 @@ func main() {
 
 	// Initialize your handlers
 	http.HandleFunc("/api/signup", handlers.SignupHandler)
-	http.HandleFunc("/api/login", handlers.LoginHandler)
+	// http.HandleFunc("/api/login", handlers.LoginHandler)
 
 	// Start the server on port 7070
 	log.Println("Starting server on port 5000...")
