@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
@@ -51,14 +52,14 @@ type signupOutput struct {
 }
 
 type userOutput struct {
-	ID       string `json:"id"`
-	Password string `json:"password"`
-	Role     string `json:"role"` // Add role here
+	ID string `json:"id"`
+	// Password string `json:"password"`
+	// Role     string `json:"role"` // Add role here
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
+	log.Println("mmmmmmmm")
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
@@ -71,7 +72,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
-
+	log.Println("this the action payload", actionPayload)
 	result, err := signup(actionPayload.Input)
 	if err != nil {
 		errorObject := GraphQLError{
@@ -85,6 +86,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, _ := json.Marshal(result)
 	w.Write(data)
+	log.Println("the data is", data)
 }
 
 func signup(args signupArgs) (response signupOutput, err error) {
@@ -94,8 +96,8 @@ func signup(args signupArgs) (response signupOutput, err error) {
 	}
 
 	variables := map[string]interface{}{
-		"username": args.Username,
 		"email":    args.Email,
+		"username": args.Username,
 		"password": hashedPassword,
 	}
 
@@ -115,6 +117,7 @@ func signup(args signupArgs) (response signupOutput, err error) {
 
 func executeSignup(variables map[string]interface{}) (response GraphQLResponse, err error) {
 	// GraphQL query
+	log.Println("excutesignup place")
 	query := `mutation ($username: String!, $email: String!, $password: String!) {
         signup(input: {username: $username, email: $email, password: $password}) {
             id

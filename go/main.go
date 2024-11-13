@@ -2,6 +2,7 @@ package main
 
 import (
 	"event_backend/handlers" // Adjust based on your module name
+	"fmt"
 	"log"
 	"net/http"
 
@@ -23,9 +24,7 @@ func main() {
 	// http.HandleFunc("/api/login", handlers.LoginHandler)
 
 	// Start the server on port 5000
-	log.Println("Starting server on port 5000...")
-	err = http.ListenAndServe(":5000", router) // Use the router here
-	if err != nil {
-		log.Fatalf("Could not start server: %s", err)
-	}
+	fmt.Println("Server is listening on port 5000...")
+
+	log.Fatal(http.ListenAndServe(":5000", router))
 }
