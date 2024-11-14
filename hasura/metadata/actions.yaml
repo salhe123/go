@@ -12,7 +12,8 @@ actions:
   - name: signup
     definition:
       kind: synchronous
-      handler: http://192.168.70.42:5000/api/signup
+      handler: http://172.17.0.1:5000/signup
+      timeout: 5
     comment: signup
 custom_types:
   enums: []

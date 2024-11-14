@@ -5,26 +5,32 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
-	"github.com/gorilla/mux" // Import the mux package here
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	// Load the .env file
-	err := godotenv.Load(".env") // Load .env from the current directory
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	// Get the port from environment variables, with a default fallback
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "5000"
 	}
 
 	router := mux.NewRouter() // Initialize the router using mux
 
 	// Initialize your handlers
-	router.HandleFunc("/api/signup", handlers.SignupHandler).Methods("POST")
-	// http.HandleFunc("/api/login", handlers.LoginHandler)
+	router.HandleFunc("/signup", handlers.SignupHandler).Methods("POST")
+	// router.HandleFunc("/api/login", handlers.LoginHandler).Methods("POST") // Uncomment if needed
 
-	// Start the server on port 5000
-	fmt.Println("Server is listening on port 5000...")
-
-	log.Fatal(http.ListenAndServe(":5000", router))
+	// Start the server
+	fmt.Printf("Server is listening on port %s...\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }
