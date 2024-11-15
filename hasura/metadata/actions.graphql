@@ -16,7 +16,12 @@ type Mutation {
   ): signupOutput
 }
 
-
+input SignupInput {
+  first_name: String!
+  last_name: String!
+  email: String!
+  password: String!
+}
 
 input LoginInput {
   email: String!
@@ -50,5 +55,8 @@ type ImageUploadOutput {
   message: String
 }
 
-
+type signupOutput {
+  id: String!
+  message: String!
+}
 
