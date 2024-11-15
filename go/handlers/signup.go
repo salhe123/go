@@ -30,29 +30,26 @@ type GraphQLRequest struct {
 	Variables interface{} `json:"variables"`
 }
 
-// GraphQLData represents the data section in the GraphQL response.
-type GraphQLData struct {
-	Insert_user_one signupOutput `json:"insert_user_one"`
-}
-
 // GraphQLResponse represents the overall response from the GraphQL server.
 type GraphQLResponse struct {
-	Data   GraphQLData    `json:"data,omitempty"`
+	Data   interface{}    `json:"data,omitempty"`
 	Errors []GraphQLError `json:"errors,omitempty"`
 }
 
 // signupArgs defines the input fields required for signup.
 type signupArgs struct {
-	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Username string `json:"username"`
 }
 
 // signupOutput defines the output structure of a successful signup.
 type signupOutput struct {
-	ID string `json:"id"`
+	ID      string `json:"id"`
+	Message string `json:"message"`
 }
 
+// SignupHandler is the HTTP handler for processing signup requests.
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -86,45 +83,56 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseData)
 }
 
-func signup(args signupArgs) (response signupOutput, err error) {
+// signup handles the signup logic, including password hashing and GraphQL execution.
+func signup(args signupArgs) (signupOutput, error) {
+	// Hash the password before saving
 	hashedPassword, err := hashPassword(args.Password)
 	if err != nil {
 		log.Printf("Failed to hash password: %v", err)
-		return response, fmt.Errorf("Failed to hash password: %v", err)
+		return signupOutput{}, fmt.Errorf("Failed to hash password: %v", err)
 	}
 
 	// Define variables for the GraphQL mutation
 	variables := map[string]interface{}{
-		"email":    args.Email,
-		"username": args.Username,
-		"password": hashedPassword,
+		"input": signupArgs{
+			Email:    args.Email,
+			Password: hashedPassword,
+			Username: args.Username,
+		},
 	}
 
 	// Execute the GraphQL mutation
 	hasuraResponse, err := executeSignup(variables)
 	if err != nil {
 		log.Printf("Failed to execute signup: %v", err)
-		return response, fmt.Errorf("Failed to execute signup: %v", err)
+		return signupOutput{}, fmt.Errorf("Failed to execute signup: %v", err)
 	}
 
 	// Handle errors from the GraphQL response
 	if len(hasuraResponse.Errors) > 0 {
 		log.Printf("Hasura response error: %s", hasuraResponse.Errors[0].Message)
-		return response, errors.New(hasuraResponse.Errors[0].Message)
+		return signupOutput{}, errors.New(hasuraResponse.Errors[0].Message)
 	}
 
 	// Return the signup response
-	response = hasuraResponse.Data.Insert_user_one
-	return response, nil
+	if data, ok := hasuraResponse.Data.(*signupOutput); ok {
+		return *data, nil
+	}
+	return signupOutput{}, fmt.Errorf("Unexpected response format")
 }
 
-func executeSignup(variables map[string]interface{}) (response GraphQLResponse, err error) {
-	query := `mutation ($username: String!, $email: String!, $password: String!) {
-		signup(input: {username: $username, email: $email, password: $password}) {
-			id
-			message
-		}
-	}`
+// executeSignup sends the GraphQL request to Hasura and returns the response.
+func executeSignup(variables map[string]interface{}) (GraphQLResponse, error) {
+	query := `mutation MyMutation( $email: String!, $password: String!,$username: String!) {
+  signup(input: { email: $email, password: $password, username: $username }) {
+    id
+    message
+  }
+}
+`
+
+	// Log the variables before sending the request
+	log.Printf("GraphQL Variables: %v", variables)
 
 	// Prepare request body
 	reqBody := GraphQLRequest{
@@ -134,7 +142,7 @@ func executeSignup(variables map[string]interface{}) (response GraphQLResponse, 
 	reqBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		log.Printf("Failed to marshal request: %v", err)
-		return response, fmt.Errorf("Failed to marshal request: %v", err)
+		return GraphQLResponse{}, fmt.Errorf("Failed to marshal request: %v", err)
 	}
 
 	// Fetch Hasura environment variables
@@ -142,14 +150,14 @@ func executeSignup(variables map[string]interface{}) (response GraphQLResponse, 
 	adminSecret := os.Getenv("HASURA_GRAPHQL_ADMIN_SECRET")
 	if hasuraAdminURL == "" || adminSecret == "" {
 		log.Printf("Missing Hasura Admin URL or Secret")
-		return response, errors.New("Missing Hasura Admin URL or Secret")
+		return GraphQLResponse{}, errors.New("Missing Hasura Admin URL or Secret")
 	}
 
 	// Create HTTP request to Hasura
 	req, err := http.NewRequest("POST", hasuraAdminURL, bytes.NewBuffer(reqBytes))
 	if err != nil {
 		log.Printf("Failed to create request: %v", err)
-		return response, fmt.Errorf("Failed to create request: %v", err)
+		return GraphQLResponse{}, fmt.Errorf("Failed to create request: %v", err)
 	}
 
 	// Set required headers
@@ -161,7 +169,7 @@ func executeSignup(variables map[string]interface{}) (response GraphQLResponse, 
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Request failed: %v", err)
-		return response, fmt.Errorf("Request failed: %v", err)
+		return GraphQLResponse{}, fmt.Errorf("Request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -169,18 +177,19 @@ func executeSignup(variables map[string]interface{}) (response GraphQLResponse, 
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Failed to read response: %v", err)
-		return response, fmt.Errorf("Failed to read response: %v", err)
+		return GraphQLResponse{}, fmt.Errorf("Failed to read response: %v", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("GraphQL query failed: %s", string(respBytes))
-		return response, fmt.Errorf("GraphQL query failed: %s", string(respBytes))
+		return GraphQLResponse{}, fmt.Errorf("GraphQL query failed: %s", string(respBytes))
 	}
 
 	// Unmarshal the GraphQL response
+	var response GraphQLResponse
 	err = json.Unmarshal(respBytes, &response)
 	if err != nil {
 		log.Printf("Failed to parse response: %v", err)
-		return response, fmt.Errorf("Failed to parse response: %v", err)
+		return GraphQLResponse{}, fmt.Errorf("Failed to parse response: %v", err)
 	}
 
 	return response, nil
