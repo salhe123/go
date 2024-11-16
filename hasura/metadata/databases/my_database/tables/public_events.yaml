@@ -10,6 +10,21 @@ insert_permissions:
       columns: []
     comment: ""
 select_permissions:
+  - role: public
+    permission:
+      columns:
+        - address
+        - created_at
+        - date
+        - description
+        - id
+        - location
+        - price
+        - title
+        - updated_at
+        - venue
+      filter: {}
+    comment: ""
   - role: user
     permission:
       columns: []

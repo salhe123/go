@@ -1,31 +1,26 @@
 type Mutation {
-  image_upload(
-    arg1: ImageUploadInput!
-  ): ImageUploadOutput
+  """
+  Signup Mutation for user registration
+  """
+  signup(input: signupArgs!): signupOutput
 }
 
-type Mutation {
-  login(
-    arg1: LoginInput!
-  ): LoginOutput
-}
-
-type Mutation {
-  signup(
-    input: signupArgs!
-  ): signupOutput
-}
-
-input SignupInput {
-  first_name: String!
-  last_name: String!
+# The input type for the signup mutation
+input signupArgs {
   email: String!
   password: String!
+  username: String!
 }
 
-input LoginInput {
-  email: String!
-  password: String!
+# The output type after the signup mutation
+type signupOutput {
+  id: ID!
+  message: String!
+}
+
+# Image Upload Mutation (if you still need this one)
+type Mutation {
+  image_upload(arg1: ImageUploadInput!): ImageUploadOutput
 }
 
 input ImageUploadInput {
@@ -33,15 +28,19 @@ input ImageUploadInput {
   user_id: ID
 }
 
-input signupArgs {
-  username: String!
-  email: String!
-  password: String!
+type ImageUploadOutput {
+  url: String!
+  message: String
 }
 
-type SignupOutput {
-  id: ID!
-  message: String
+# Login Mutation (if needed)
+type Mutation {
+  login(arg1: LoginInput!): LoginOutput
+}
+
+input LoginInput {
+  email: String!
+  password: String!
 }
 
 type LoginOutput {
@@ -49,14 +48,3 @@ type LoginOutput {
   token: String
   message: String
 }
-
-type ImageUploadOutput {
-  url: String!
-  message: String
-}
-
-type signupOutput {
-  id: String!
-  message: String!
-}
-

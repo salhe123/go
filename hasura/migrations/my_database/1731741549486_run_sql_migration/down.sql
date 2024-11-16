@@ -1,0 +1,4 @@
+-- Could not auto-generate a down migration.
+-- Please write an appropriate down migration for the SQL below:
+-- ALTER TABLE users DROP CONSTRAINT users_email_key;
+-- ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE(email);

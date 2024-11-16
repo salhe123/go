@@ -18,7 +18,7 @@ func main() {
 	}
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5000"
+		port = "3000"
 	}
 	router := mux.NewRouter()
 	router.HandleFunc("/signup", handlers.SignupHandler).Methods("POST")
