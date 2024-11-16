@@ -1,7 +1,9 @@
 type Mutation {
   image_upload(
-    arg1: ImageUploadInput!
-  ): ImageUploadOutput
+    id: uuid!
+    images: [String!]!
+    featured_image_url: String
+  ): Event!
 }
 
 type Mutation {
@@ -32,8 +34,8 @@ input LoginInput {
 }
 
 input ImageUploadInput {
-  file: String!
-  user_id: ID
+  event_id: uuid!
+  images: [ImageInput!]!
 }
 
 input signupArgs {
@@ -45,6 +47,11 @@ input signupArgs {
 input loginArgs {
   email: String!
   password: String!
+}
+
+input ImageInput {
+  image_url: String!
+  is_featured: Boolean
 }
 
 type SignupOutput {
@@ -66,5 +73,19 @@ type ImageUploadOutput {
 type signupOutput {
   id: uuid!
   message: String!
+}
+
+type EventImage {
+  id: uuid!
+  event_id: uuid!
+  image_url: String!
+  is_featured: Boolean
+  created_at: timestamptz!
+}
+
+type Event {
+  id: uuid!
+  image: [String!]!
+  featured_image_url: String
 }
 

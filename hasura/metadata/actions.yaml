@@ -2,7 +2,7 @@ actions:
   - name: image_upload
     definition:
       kind: synchronous
-      handler: http://localhost:7070/api/image_upload
+      handler: http://172.17.0.1:3000/image_upload
     comment: image_upload
   - name: login
     definition:
@@ -23,9 +23,12 @@ custom_types:
     - name: ImageUploadInput
     - name: signupArgs
     - name: loginArgs
+    - name: ImageInput
   objects:
     - name: SignupOutput
     - name: LoginOutput
     - name: ImageUploadOutput
     - name: signupOutput
+    - name: EventImage
+    - name: Event
   scalars: []
