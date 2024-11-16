@@ -34,7 +34,7 @@ type GraphQLRequest struct {
 
 type GraphQLData struct {
 	Insert_users_one signupOutput `json:"insert_users_one"`
-	User             []userOutput `json:"user"` // Changed to array
+	Users            []userOutput `json:"users"` // Changed to array
 }
 
 type GraphQLResponse struct {

@@ -6,7 +6,8 @@ type Mutation {
 
 type Mutation {
   login(
-    arg1: LoginInput!
+    email: String!
+    password: String!
   ): LoginOutput
 }
 
@@ -39,6 +40,11 @@ input signupArgs {
   email: String!
   password: String!
   username: String!
+}
+
+input loginArgs {
+  email: String!
+  password: String!
 }
 
 type SignupOutput {

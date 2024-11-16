@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"strconv" // Import for int to string conversion
+	"strconv"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -16,68 +17,65 @@ import (
 
 type JWTClaims struct {
 	ID   string `json:"id"`
-	Role string `json:"role"` // Add role field for Hasura
+	Role string `json:"role"`
 	jwt.StandardClaims
 }
 
-// Secret key for signing JWT
 var jwtSecret = []byte("your_secret_key_here")
 
-// Struct to capture the payload for login
 type loginArgs struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// The LoginHandler processes the login request
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Read the request body
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		log.Println("Error reading request body:", err)
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	// Parse the JSON payload into a struct (simplified input structure)
 	var actionPayload struct {
-		Input loginArgs `json:"input"` // Directly access the input fields
+		Action struct {
+			Name string `json:"name"`
+		} `json:"action"`
+		Input struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		} `json:"input"`
 	}
 
-	// Unmarshal the request body into the actionPayload
 	err = json.Unmarshal(reqBody, &actionPayload)
 	if err != nil {
+		log.Println("Error unmarshaling request body:", err)
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	// Get the login input (email and password)
-	loginPayload := actionPayload.Input
+	// Extract email and password from the input field
+	email := actionPayload.Input.Email
+	password := actionPayload.Input.Password
+	log.Printf("Parsed login payload: email=%s, password=%s\n", email, password)
 
-	// Call the login function to process the login
-	result, err := login(loginPayload)
-	if err != nil {
-		errorObject := GraphQLError{
-			Message: err.Error(),
-		}
-		errorBody, _ := json.Marshal(errorObject)
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write(errorBody)
+	if email == "" || password == "" {
+		log.Println("Missing email or password")
+		http.Error(w, "email and password are required", http.StatusBadRequest)
 		return
 	}
-
-	// Convert `int` ID to `string`
-	idAsString := strconv.Itoa(result.ID)
-
-	// Generate JWT token
-	token, err := generateJWT(idAsString, result.Role)
+	result, err := login(loginArgs{Email: email, Password: password})
 	if err != nil {
+		log.Println("Login failed:", err)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	token, err := generateJWT(strconv.Itoa(result.ID), result.Role)
+	if err != nil {
+		log.Println("Error generating token:", err)
 		http.Error(w, "failed to generate token", http.StatusInternalServerError)
 		return
 	}
-
-	// Respond with user info and JWT token
 	response := struct {
 		ID    int    `json:"id"`
 		Token string `json:"token"`
@@ -85,74 +83,76 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}{
 		ID:    result.ID,
 		Token: token,
-		Role:  result.Role, // Return the role
+		Role:  result.Role,
 	}
 
-	// Send the response back to Hasura
 	data, _ := json.Marshal(response)
 	w.Write(data)
 }
 
-// The login function validates the credentials
 func login(args loginArgs) (response userOutput, err error) {
-	// Check credentials via Hasura GraphQL query
 	hasuraResponse, err := executeLogin(map[string]interface{}{
 		"email": args.Email,
 	})
 	if err != nil {
 		return
 	}
+	log.Println("hasura response", hasuraResponse)
 
-	// Handle errors from Hasura response
 	if len(hasuraResponse.Errors) != 0 {
 		err = errors.New(hasuraResponse.Errors[0].Message)
 		return
 	}
-	if len(hasuraResponse.Data.User) == 0 {
+	if len(hasuraResponse.Data.Users) == 0 {
 		err = errors.New("invalid credentials")
 		return
 	}
 
-	// Check password hash for validity
-	user := hasuraResponse.Data.User[0] // Assuming we only need the first match
+	user := hasuraResponse.Data.Users[0]
 	isValid := checkPasswordHash(args.Password, user.Password)
 	if !isValid {
 		err = errors.New("invalid credentials")
 		return
 	}
-
-	// Return the user response
 	response = user
 	return
 }
 
-// Check password hash against stored hash
 func checkPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
 
-// Generate JWT token
-func generateJWT(userID, role string) (string, error) {
-	claims := JWTClaims{
-		ID:   userID,
-		Role: role, // Include role in the token
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-			Issuer:    "your_app", // Adjust the issuer name as needed
+func generateJWT(ID string, role string) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":   ID,
+		"name":  "seya",
+		"admin": role == "admin",
+		"iat":   time.Now().Unix(),
+		"exp":   time.Now().Add(time.Hour * 24).Unix(),
+		"iss":   "Event",
+		// Hasura-specific claims
+		"https://hasura.io/jwt/claims": map[string]interface{}{
+			"x-hasura-default-role":  role,
+			"x-hasura-allowed-roles": []string{role, "admin"},
+			"x-hasura-user-id":       ID,
+			"x-hasura-org-id":        "456",
+			"x-hasura-custom":        "custom-value",
 		},
 	}
 
-	// Sign and return the JWT token
+	// Create the JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtSecret)
+
+	secretKey := []byte("your_secret_key")
+	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
 		return "", err
 	}
+
 	return tokenString, nil
 }
 
-// Execute GraphQL query for login
 func executeLogin(variables map[string]interface{}) (response GraphQLResponse, err error) {
 	query := `query ($email: String!) {
         users(where: {email: {_eq: $email}}) {
@@ -162,7 +162,6 @@ func executeLogin(variables map[string]interface{}) (response GraphQLResponse, e
         }
     }`
 
-	// Construct GraphQL request
 	reqBody := GraphQLRequest{
 		Query:     query,
 		Variables: variables,
@@ -172,26 +171,22 @@ func executeLogin(variables map[string]interface{}) (response GraphQLResponse, e
 		return
 	}
 
-	// Send the request to Hasura GraphQL endpoint
 	resp, err := http.Post("http://localhost:8080/v1/graphql", "application/json", bytes.NewBuffer(reqBytes))
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
 
-	// Read the response
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
 
-	// Handle non-OK responses from Hasura
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("failed to execute GraphQL query: %s", string(respBytes))
 		return
 	}
 
-	// Parse the response JSON
 	err = json.Unmarshal(respBytes, &response)
 	if err != nil {
 		return

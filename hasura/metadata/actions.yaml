@@ -22,6 +22,7 @@ custom_types:
     - name: LoginInput
     - name: ImageUploadInput
     - name: signupArgs
+    - name: loginArgs
   objects:
     - name: SignupOutput
     - name: LoginOutput
