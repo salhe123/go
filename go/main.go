@@ -22,7 +22,7 @@ func main() {
 	}
 	router := mux.NewRouter()
 	router.HandleFunc("/signup", handlers.SignupHandler).Methods("POST")
-	// router.HandleFunc("/api/login", handlers.LoginHandler).Methods("POST") // Uncomment if needed
+	router.HandleFunc("/login", handlers.LoginHandler).Methods("POST") // Uncomment if needed
 	fmt.Printf("Server is listening on port %s...\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }

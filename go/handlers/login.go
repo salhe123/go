@@ -3,37 +3,33 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"os"
+	"strconv" // Import for int to string conversion
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// JWT Signing key (should be securely stored, e.g., in environment variables)
-var mySigningKey = []byte("your_secret_key") // Use a secret key
+type JWTClaims struct {
+	ID   string `json:"id"`
+	Role string `json:"role"` // Add role field for Hasura
+	jwt.StandardClaims
+}
 
-// LoginArgs struct to parse the request payload
-type LoginArgs struct {
+// Secret key for signing JWT
+var jwtSecret = []byte("your_secret_key_here")
+
+// Struct to capture the payload for login
+type loginArgs struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// LoginOutput struct for the response
-type LoginOutput struct {
-	ID    string `json:"id"`
-	Token string `json:"token"`
-}
-
-// GraphQLError struct for handling error from Hasura
-type GraphQLEr struct {
-	Message string `json:"message"`
-}
-
-// Login handler to authenticate user
+// The LoginHandler processes the login request
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -44,131 +40,162 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the body as action payload
-	var loginArgs LoginArgs
-	err = json.Unmarshal(reqBody, &loginArgs)
+	// Parse the JSON payload into a struct (simplified input structure)
+	var actionPayload struct {
+		Input loginArgs `json:"input"` // Directly access the input fields
+	}
+
+	// Unmarshal the request body into the actionPayload
+	err = json.Unmarshal(reqBody, &actionPayload)
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	// Get Hasura endpoint and admin secret from environment variables
-	hasuraEndpoint := os.Getenv("HASURA_GRAPHQL_ENDPOINT")
-	hasuraAdminSecret := os.Getenv("HASURA_GRAPHQL_ADMIN_SECRET")
+	// Get the login input (email and password)
+	loginPayload := actionPayload.Input
 
-	// Create the GraphQL query to fetch user data by email
-	query := `query($email: String!) {
-		users(where: {email: {_eq: $email}}) {
-			id
-			password
+	// Call the login function to process the login
+	result, err := login(loginPayload)
+	if err != nil {
+		errorObject := GraphQLError{
+			Message: err.Error(),
 		}
-	}`
+		errorBody, _ := json.Marshal(errorObject)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write(errorBody)
+		return
+	}
 
-	// Create a request payload
-	var requestBody = map[string]interface{}{
-		"query": query,
-		"variables": map[string]interface{}{
-			"email": loginArgs.Email,
+	// Convert `int` ID to `string`
+	idAsString := strconv.Itoa(result.ID)
+
+	// Generate JWT token
+	token, err := generateJWT(idAsString, result.Role)
+	if err != nil {
+		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with user info and JWT token
+	response := struct {
+		ID    int    `json:"id"`
+		Token string `json:"token"`
+		Role  string `json:"role"`
+	}{
+		ID:    result.ID,
+		Token: token,
+		Role:  result.Role, // Return the role
+	}
+
+	// Send the response back to Hasura
+	data, _ := json.Marshal(response)
+	w.Write(data)
+}
+
+// The login function validates the credentials
+func login(args loginArgs) (response userOutput, err error) {
+	// Check credentials via Hasura GraphQL query
+	hasuraResponse, err := executeLogin(map[string]interface{}{
+		"email": args.Email,
+	})
+	if err != nil {
+		return
+	}
+
+	// Handle errors from Hasura response
+	if len(hasuraResponse.Errors) != 0 {
+		err = errors.New(hasuraResponse.Errors[0].Message)
+		return
+	}
+	if len(hasuraResponse.Data.User) == 0 {
+		err = errors.New("invalid credentials")
+		return
+	}
+
+	// Check password hash for validity
+	user := hasuraResponse.Data.User[0] // Assuming we only need the first match
+	isValid := checkPasswordHash(args.Password, user.Password)
+	if !isValid {
+		err = errors.New("invalid credentials")
+		return
+	}
+
+	// Return the user response
+	response = user
+	return
+}
+
+// Check password hash against stored hash
+func checkPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+// Generate JWT token
+func generateJWT(userID, role string) (string, error) {
+	claims := JWTClaims{
+		ID:   userID,
+		Role: role, // Include role in the token
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+			Issuer:    "your_app", // Adjust the issuer name as needed
 		},
 	}
 
-	// Convert request body to JSON
-	jsonBody, err := json.Marshal(requestBody)
+	// Sign and return the JWT token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
-		http.Error(w, "Error encoding request", http.StatusInternalServerError)
+		return "", err
+	}
+	return tokenString, nil
+}
+
+// Execute GraphQL query for login
+func executeLogin(variables map[string]interface{}) (response GraphQLResponse, err error) {
+	query := `query ($email: String!) {
+        users(where: {email: {_eq: $email}}) {
+            id
+            password
+            role
+        }
+    }`
+
+	// Construct GraphQL request
+	reqBody := GraphQLRequest{
+		Query:     query,
+		Variables: variables,
+	}
+	reqBytes, err := json.Marshal(reqBody)
+	if err != nil {
 		return
 	}
 
-	// Make the HTTP request to Hasura
-	req, err := http.NewRequest("POST", hasuraEndpoint, bytes.NewBuffer(jsonBody))
+	// Send the request to Hasura GraphQL endpoint
+	resp, err := http.Post("http://localhost:8080/v1/graphql", "application/json", bytes.NewBuffer(reqBytes))
 	if err != nil {
-		http.Error(w, "Error creating request", http.StatusInternalServerError)
-		return
-	}
-
-	// Set headers for Hasura
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-hasura-admin-secret", hasuraAdminSecret)
-
-	// Send the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		http.Error(w, "Error sending request to Hasura", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
-	// Parse the response from Hasura
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	// Read the response
+	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		http.Error(w, "Error decoding response", http.StatusInternalServerError)
-		return
-	}
-	log.Printf("Hasura Response: %+v", response)
-
-	// Check if the user exists (ensure "users" field exists)
-	data, ok := response["data"].(map[string]interface{})
-	if !ok {
-		http.Error(w, "Unexpected response structure", http.StatusInternalServerError)
 		return
 	}
 
-	users, ok := data["users"].([]interface{})
-	if !ok || len(users) == 0 {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+	// Handle non-OK responses from Hasura
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("failed to execute GraphQL query: %s", string(respBytes))
 		return
 	}
 
-	// Retrieve the user info from the response
-	user := users[0].(map[string]interface{})
-	hashedPassword := user["password"].(string)
-	userID := user["id"].(string)
-
-	// Compare the password with the stored hashed password
-	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(loginArgs.Password))
+	// Parse the response JSON
+	err = json.Unmarshal(respBytes, &response)
 	if err != nil {
-		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	// Generate JWT token for the user
-	token, err := generateJWT(userID) // Pass the actual userID here
-	if err != nil {
-		http.Error(w, "Error generating token", http.StatusInternalServerError)
-		return
-	}
-
-	// Prepare the response
-	loginOutput := LoginOutput{
-		ID:    userID,
-		Token: token,
-	}
-
-	// Send the response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(loginOutput)
-}
-
-func generateJWT(userID string) (string, error) {
-	// Create JWT claims
-	claims := jwt.MapClaims{
-		"sub": userID,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
-		"https://hasura.io/jwt/claims": map[string]interface{}{
-			"x-hasura-user-id":       userID,
-			"x-hasura-default-role":  "user",
-			"x-hasura-allowed-roles": []string{"user"},
-		},
-	}
-
-	// Generate JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(mySigningKey)
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
+	return
 }

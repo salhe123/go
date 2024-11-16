@@ -7,7 +7,7 @@ actions:
   - name: login
     definition:
       kind: synchronous
-      handler: http://192.168.70.42:5000/api/login
+      handler: http://172.17.0.1:3000/login
     comment: login
   - name: signup
     definition:
