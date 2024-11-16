@@ -24,7 +24,6 @@ type GraphQLEr struct {
 }
 
 type image_uploadArgs struct {
-	ID               string   `json:"id"`
 	Images           []string `json:"images"`
 	FeaturedImageURL string   `json:"featured_image_url"`
 }
@@ -128,7 +127,6 @@ func image_upload(args image_uploadArgs) (response Event, err error) {
 
 	// Example response - you can customize this based on your database response
 	response = Event{
-		ID:               args.ID,
 		Image:            uploadedImages,
 		FeaturedImageURL: featuredImageURL,
 	}

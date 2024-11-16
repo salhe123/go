@@ -1,6 +1,5 @@
 type Mutation {
   image_upload(
-    id: uuid!
     images: [String!]!
     featured_image_url: String
   ): Event!
