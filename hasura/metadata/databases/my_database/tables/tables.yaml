@@ -1,6 +1,5 @@
 - "!include public_bookmarks.yaml"
 - "!include public_categories.yaml"
-- "!include public_event_images.yaml"
 - "!include public_event_tags.yaml"
 - "!include public_events.yaml"
 - "!include public_followers.yaml"

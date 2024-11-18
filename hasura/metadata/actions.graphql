@@ -1,8 +1,9 @@
 type Mutation {
   image_upload(
-    images: [String!]!
-    featured_image_url: String
-  ): Event!
+    file: String!
+    event_id: uuid!
+    is_featured: Boolean!
+  ): Output!
 }
 
 type Mutation {
@@ -86,5 +87,9 @@ type Event {
   id: uuid!
   image: [String!]!
   featured_image_url: String
+}
+
+type Output {
+  file_path: String!
 }
 
