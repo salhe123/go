@@ -53,3 +53,18 @@ delete_permissions:
     permission:
       filter: {}
     comment: ""
+event_triggers:
+  - name: welcome_email
+    definition:
+      delete:
+        columns: '*'
+      enable_manual: true
+      insert:
+        columns: '*'
+      update:
+        columns: '*'
+    retry_conf:
+      interval_sec: 10
+      num_retries: 0
+      timeout_sec: 60
+    webhook: http://172.17.0.1:5000/welcome_email

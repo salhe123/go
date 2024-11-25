@@ -1,0 +1,7 @@
+-- Could not auto-generate a down migration.
+-- Please write an appropriate down migration for the SQL below:
+-- ALTER TABLE imagestore
+-- ADD CONSTRAINT fk_event
+-- FOREIGN KEY (event_id)
+-- REFERENCES events(id)
+-- ON DELETE CASCADE;

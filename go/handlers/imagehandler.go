@@ -1,136 +1,91 @@
 package handlers
 
 import (
-	"context"
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
-	"github.com/joho/godotenv"
 )
 
-type ActionPayloads struct {
-	SessionVariables map[string]interface{} `json:"session_variables"`
-	Input            image_uploadArgs       `json:"input"`
-}
+var cld *cloudinary.Cloudinary
 
-type GraphQLEr struct {
-	Message string `json:"message"`
-}
+func init() {
+	var err error
 
-type image_uploadArgs struct {
-	Images           []string `json:"images"`
-	FeaturedImageURL string   `json:"featured_image_url"`
-}
+	// Load Cloudinary parameters from environment variables
+	cloudinaryName := os.Getenv("CLOUDINARY_NAME")
+	cloudinaryAPIKey := os.Getenv("CLOUDINARY_API_KEY")
+	cloudinaryAPISecret := os.Getenv("CLOUDINARY_API_SECRET")
 
-// Event represents the event with the images
-type Event struct {
-	ID               string   `json:"id"`
-	Image            []string `json:"image"`
-	FeaturedImageURL string   `json:"featured_image_url"`
-}
-
-// Function to upload image to Cloudinary
-func uploadToCloudinary(base64Image string) (string, error) {
-	// Load the environment variables from the .env file
-	err := godotenv.Load()
+	cld, err = cloudinary.NewFromParams(cloudinaryName, cloudinaryAPIKey, cloudinaryAPISecret)
 	if err != nil {
-		log.Fatal("Error loading .env file")
-		return "", err
+		log.Fatalf("Failed to create Cloudinary instance: %v", err)
 	}
-
-	// Get Cloudinary credentials from environment variables
-	cloudinaryURL := os.Getenv("CLOUDINARY_URL")
-	if cloudinaryURL == "" {
-		return "", fmt.Errorf("CLOUDINARY_URL is not set in environment variables")
-	}
-
-	cld, err := cloudinary.NewFromURL(cloudinaryURL)
-	if err != nil {
-		return "", err
-	}
-
-	// Upload base64 image to Cloudinary
-	resp, err := cld.Upload.Upload(context.Background(), base64Image, uploader.UploadParams{ResourceType: "image"})
-	if err != nil {
-		return "", err
-	}
-
-	// Return the URL of the uploaded image
-	return resp.SecureURL, nil
 }
 
-// image_handler is the handler function that processes the image upload request
-func image_handler(w http.ResponseWriter, r *http.Request) {
-	// Set response header as JSON
+type UploadImagesRequest struct {
+	Input struct {
+		Base64Strs []string `json:"base64_strs"` // Array of base64-encoded strings
+	} `json:"input"`
+}
+
+type ImageUploadResponse struct {
+	Urls []string `json:"urls"` // List of uploaded image URLs
+}
+
+func UploadBase64Images(w http.ResponseWriter, r *http.Request) {
+	var request UploadImagesRequest
+
+	// Decode incoming JSON payload
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate input
+	if len(request.Input.Base64Strs) == 0 {
+		http.Error(w, "No images provided", http.StatusBadRequest)
+		return
+	}
+
+	var uploadedURLs []string
+	for _, base64Str := range request.Input.Base64Strs {
+		// Remove potential prefix
+		if strings.HasPrefix(base64Str, "data:image/") {
+			base64Str = base64Str[strings.IndexByte(base64Str, ',')+1:]
+		}
+
+		// Decode the image
+		decodedImage, err := base64.StdEncoding.DecodeString(base64Str)
+		if err != nil {
+			log.Printf("Failed to decode base64 string: %v", err)
+			http.Error(w, "Failed to decode base64 string", http.StatusInternalServerError)
+			return
+		}
+
+		// Upload the image to Cloudinary
+		uploadResp, err := cld.Upload.Upload(r.Context(), bytes.NewReader(decodedImage), uploader.UploadParams{Folder: "images"})
+		if err != nil {
+			log.Printf("Error while uploading to Cloudinary: %v", err)
+			http.Error(w, "Failed to upload image to Cloudinary", http.StatusInternalServerError)
+			return
+		}
+
+		// Append the uploaded URL to the list
+		uploadedURLs = append(uploadedURLs, uploadResp.SecureURL)
+	}
+
+	// Return the list of uploaded URLs
+	response := ImageUploadResponse{Urls: uploadedURLs}
+	responseData, _ := json.Marshal(response)
 	w.Header().Set("Content-Type", "application/json")
-
-	// Read request body
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
-		return
-	}
-
-	// Parse the body as action payload
-	var actionPayload ActionPayloads
-	err = json.Unmarshal(reqBody, &actionPayload)
-	if err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
-		return
-	}
-
-	// Send the request params to the Action's generated handler function
-	result, err := image_upload(actionPayload.Input)
-
-	// Throw error if an error happens
-	if err != nil {
-		errorObject := GraphQLEr{
-			Message: err.Error(),
-		}
-		errorBody, _ := json.Marshal(errorObject)
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write(errorBody)
-		return
-	}
-
-	// Write the response as JSON
-	data, _ := json.Marshal(result)
-	w.Write(data)
-}
-
-// image_upload function that processes the image upload
-func image_upload(args image_uploadArgs) (response Event, err error) {
-	var uploadedImages []string
-
-	// Loop through each image, upload to Cloudinary, and store the URLs
-	for _, base64Image := range args.Images {
-		imageURL, uploadErr := uploadToCloudinary(base64Image)
-		if uploadErr != nil {
-			return Event{}, fmt.Errorf("error uploading image: %v", uploadErr)
-		}
-		uploadedImages = append(uploadedImages, imageURL)
-	}
-
-	// Set the featured image URL (the first image in the uploaded list)
-	featuredImageURL := ""
-	if len(uploadedImages) > 0 {
-		featuredImageURL = uploadedImages[0]
-	}
-
-	// Now, update the database (here you would have your database logic to insert this data)
-
-	// Example response - you can customize this based on your database response
-	response = Event{
-		Image:            uploadedImages,
-		FeaturedImageURL: featuredImageURL,
-	}
-
-	// Return the updated event with URLs
-	return response, nil
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseData)
 }

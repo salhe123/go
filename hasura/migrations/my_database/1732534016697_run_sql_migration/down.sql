@@ -1,0 +1,7 @@
+-- Could not auto-generate a down migration.
+-- Please write an appropriate down migration for the SQL below:
+-- CREATE TABLE public.imagestore (
+--     id SERIAL PRIMARY KEY,
+--     event_id INTEGER NOT NULL,
+--     url TEXT NOT NULL
+-- );

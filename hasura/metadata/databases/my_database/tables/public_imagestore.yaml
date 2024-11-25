@@ -1,0 +1,66 @@
+table:
+  name: imagestore
+  schema: public
+object_relationships:
+  - name: events
+    using:
+      manual_configuration:
+        column_mapping:
+          event_id: id
+        insertion_order: null
+        remote_table:
+          name: events
+          schema: public
+  - name: users
+    using:
+      manual_configuration:
+        column_mapping:
+          user_id: id
+        insertion_order: null
+        remote_table:
+          name: users
+          schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - event_id
+        - id
+        - user_id
+        - url
+    comment: ""
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - event_id
+        - id
+        - user_id
+        - url
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+    comment: ""
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - event_id
+        - id
+        - user_id
+        - url
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check: null
+    comment: ""
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+    comment: ""

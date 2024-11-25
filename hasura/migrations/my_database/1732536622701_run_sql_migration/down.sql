@@ -1,0 +1,6 @@
+-- Could not auto-generate a down migration.
+-- Please write an appropriate down migration for the SQL below:
+-- ALTER TABLE events
+--   ADD CONSTRAINT fk_events_organizer
+--   FOREIGN KEY (organizer_id)
+--   REFERENCES users(id) ON DELETE SET NULL;

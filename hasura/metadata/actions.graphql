@@ -1,9 +1,8 @@
 type Mutation {
-  image_upload(
-    file: String!
-    event_id: uuid!
-    is_featured: Boolean!
-  ): Output!
+  acceptPayment(
+    phoneNumber: String!
+    amount: String!
+  ): PayOutput!
 }
 
 type Mutation {
@@ -19,6 +18,12 @@ type Mutation {
     password: String!
     username: String!
   ): signupOutput
+}
+
+type Mutation {
+  uploadImages(
+    base64_strs: [String!]!
+  ): ImageUploadResponse
 }
 
 input SignupInput {
@@ -66,8 +71,8 @@ type LoginOutput {
 }
 
 type ImageUploadOutput {
-  url: String!
-  message: String
+  urls: [String!]!
+  cover_photo: String!
 }
 
 type signupOutput {
@@ -92,4 +97,21 @@ type Event {
 type Output {
   file_path: String!
 }
+
+type PaymentOutput {
+  paymentIntentId: String!
+  clientSecret: String!
+}
+
+type PayOutput {
+  message: String
+  checkoutUrl: String
+  tx_ref: String
+}
+
+type ImageUploadResponse {
+  urls: [String!]
+}
+
+scalar Upload
 

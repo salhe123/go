@@ -7,12 +7,30 @@ insert_permissions:
       check:
         user_id:
           _eq: X-Hasura-User-Id
-      columns: []
+      columns:
+        - catchedticket
+        - phonenumber
+        - event_id
+        - id
+        - quantity
+        - user_id
+        - amount
+        - created_at
+        - purchase_date
     comment: ""
 select_permissions:
   - role: user
     permission:
-      columns: []
+      columns:
+        - catchedticket
+        - phonenumber
+        - event_id
+        - id
+        - quantity
+        - user_id
+        - amount
+        - created_at
+        - purchase_date
       filter:
         user_id:
           _eq: X-Hasura-User-Id

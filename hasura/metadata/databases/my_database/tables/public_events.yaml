@@ -5,9 +5,23 @@ insert_permissions:
   - role: user
     permission:
       check:
-        organizer_id:
+        user_id:
           _eq: X-Hasura-User-Id
-      columns: []
+      columns:
+        - file_path
+        - is_free
+        - title
+        - venue
+        - id
+        - user_id
+        - price
+        - location
+        - address
+        - cover_photo
+        - description
+        - created_at
+        - date
+        - updated_at
     comment: ""
 select_permissions:
   - role: public
@@ -27,15 +41,45 @@ select_permissions:
     comment: ""
   - role: user
     permission:
-      columns: []
-      filter: {}
+      columns:
+        - file_path
+        - is_free
+        - title
+        - venue
+        - id
+        - user_id
+        - price
+        - location
+        - address
+        - cover_photo
+        - description
+        - created_at
+        - date
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
     comment: ""
 update_permissions:
   - role: user
     permission:
-      columns: []
+      columns:
+        - file_path
+        - is_free
+        - title
+        - venue
+        - id
+        - user_id
+        - price
+        - location
+        - address
+        - cover_photo
+        - description
+        - created_at
+        - date
+        - updated_at
       filter:
-        organizer_id:
+        user_id:
           _eq: X-Hasura-User-Id
       check: null
     comment: ""
@@ -43,6 +87,6 @@ delete_permissions:
   - role: user
     permission:
       filter:
-        organizer_id:
+        user_id:
           _eq: X-Hasura-User-Id
     comment: ""
