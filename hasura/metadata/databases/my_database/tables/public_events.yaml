@@ -56,8 +56,8 @@ insert_permissions:
         user_id:
           _eq: X-Hasura-User-Id
       columns:
-        - file_path
-        - is_free
+        - images
+        - specific_price
         - title
         - venue
         - id
@@ -75,23 +75,9 @@ select_permissions:
   - role: public
     permission:
       columns:
-        - address
-        - created_at
-        - date
-        - description
-        - id
-        - location
-        - price
-        - title
-        - updated_at
-        - venue
-      filter: {}
-    comment: ""
-  - role: user
-    permission:
-      columns:
-        - file_path
-        - is_free
+        - images
+        - tags
+        - specific_price
         - title
         - venue
         - id
@@ -99,21 +85,41 @@ select_permissions:
         - price
         - location
         - address
+        - categories
         - cover_photo
         - description
         - created_at
         - date
         - updated_at
-      filter:
-        user_id:
-          _eq: X-Hasura-User-Id
+      filter: {}
+    comment: ""
+  - role: user
+    permission:
+      columns:
+        - images
+        - tags
+        - specific_price
+        - title
+        - venue
+        - id
+        - user_id
+        - price
+        - location
+        - address
+        - categories
+        - cover_photo
+        - description
+        - created_at
+        - date
+        - updated_at
+      filter: {}
     comment: ""
 update_permissions:
   - role: user
     permission:
       columns:
-        - file_path
-        - is_free
+        - images
+        - specific_price
         - title
         - venue
         - id
