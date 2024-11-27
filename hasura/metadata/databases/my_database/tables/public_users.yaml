@@ -1,6 +1,44 @@
 table:
   name: users
   schema: public
+array_relationships:
+  - name: bookmarks
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: bookmarks
+          schema: public
+  - name: events
+    using:
+      manual_configuration:
+        column_mapping:
+          id: user_id
+        insertion_order: null
+        remote_table:
+          name: events
+          schema: public
+  - name: followers
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: followers
+          schema: public
+  - name: tickets
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: tickets
+          schema: public
+  - name: transactions
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: transactions
+          schema: public
 insert_permissions:
   - role: public
     permission:
