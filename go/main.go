@@ -23,9 +23,9 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/signup", handlers.SignupHandler).Methods("POST")
 	router.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
-	router.HandleFunc("/uploadImages", handlers.UploadBase64Images).Methods("POST")
-	// router.HandleFunc("/welcome_email", handlers.WelcomeEmailHandler).Methods("POST")
-	// router.HandleFunc("/image_upload", handlers.Image_Handler).Methods("POST")
+	router.HandleFunc("/uploadImages", handlers.UploadBase64Image).Methods("POST")
+	router.HandleFunc("/acceptPayment", handlers.PaymentsHandler).Methods("POST")
+	router.HandleFunc("/welcome_email", handlers.WelcomeEmailHandler)
 	fmt.Printf("Server is listening on port %s...\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }

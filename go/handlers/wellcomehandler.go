@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/smtp"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -28,14 +29,14 @@ func init() {
 	}
 }
 
-// GetSMTPConfig retrieves the SMTP configuration from the environment variables
 func GetSMTPConfig() *SMTPConfig {
+	// Gmail SMTP server details
 	return &SMTPConfig{
-		Host:     os.Getenv("MAILTRAP_HOST"),
-		Port:     os.Getenv("MAILTRAP_PORT"),
-		Username: os.Getenv("MAILTRAP_USERNAME"),
-		Password: os.Getenv("MAILTRAP_PASSWORD"),
-		From:     "salheseid92@gmail.com", // Replace with your email
+		Host:     "smtp.gmail.com",
+		Port:     "587",                           // TLS port for Gmail
+		Username: os.Getenv("GMAIL_USERNAME"),     // Set in the environment
+		Password: os.Getenv("GMAIL_APP_PASSWORD"), // Set the app-specific password
+		From:     os.Getenv("FROM_EMAIL"),         // Your Gmail address
 	}
 }
 
@@ -44,8 +45,8 @@ func sendWelcomeEmail(toEmail, username string) error {
 	smtpConfig := GetSMTPConfig()
 
 	// Construct the email message
-	subject := "Welcome to event management"
-	body := fmt.Sprintf("Hello %s,\n\nWelcome to my event management website! I am glad to have you with me.\n\nBest regards,\nGebeyehu", username)
+	subject := "Welcome to Event Management"
+	body := fmt.Sprintf("Hello %s,\n\nThank you for joining our event management community! We're excited to have you on board and look forward to helping you create and manage your events with ease.\nIf you have any questions or need assistance getting started, feel free to reach out. We're here to help!\n\nBest regards,\nThe Event Management Team", username)
 	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s", smtpConfig.From, toEmail, subject, body)
 
 	// Set up authentication information
@@ -84,11 +85,13 @@ func WelcomeEmailHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		log.Printf("Error decoding request body: %v", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
 	email := user.Event.Data.New.Email
-	log.Printf("Sending email to %s", email)
+	log.Printf("Sending welcome email to: %s", email)
 
 	username := user.Event.Data.New.Username
 	err = sendWelcomeEmail(email, username)
@@ -98,6 +101,7 @@ func WelcomeEmailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Return a success message with the email sent time
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Email sent successfully to %s", email)
+	fmt.Fprintf(w, "Welcome email sent successfully to %s at %s", email, fmt.Sprintf("%v", time.Now()))
 }
