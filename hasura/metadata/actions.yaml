@@ -2,24 +2,33 @@ actions:
   - name: acceptPayment
     definition:
       kind: synchronous
-      handler: http://172.17.0.1:5000/PaymentHandler
-    comment: PaymentHandler
+      handler: http://172.17.0.1:5000/acceptPayment
+    permissions:
+      - role: user
+    comment: acceptPayment
   - name: login
     definition:
       kind: synchronous
       handler: http://172.17.0.1:5000/login
+    permissions:
+      - role: public
     comment: login
   - name: signup
     definition:
       kind: synchronous
       handler: http://172.17.0.1:5000/signup
       timeout: 5
+    permissions:
+      - role: public
+      - role: user
     comment: signup
-  - name: uploadImages
+  - name: uploadBase64Image
     definition:
       kind: synchronous
-      handler: http://172.17.0.1:5000/uploadImages
-    comment: uploadImages
+      handler: http://172.17.0.1:5000/uploadBase64Image
+    permissions:
+      - role: user
+    comment: uploadBase64Image
 custom_types:
   enums: []
   input_objects:
@@ -40,5 +49,6 @@ custom_types:
     - name: PaymentOutput
     - name: PayOutput
     - name: ImageUploadResponse
+    - name: ImageResponse
   scalars:
     - name: Upload

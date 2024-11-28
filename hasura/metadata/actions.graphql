@@ -21,9 +21,9 @@ type Mutation {
 }
 
 type Mutation {
-  uploadImages(
-    base64_strs: [String!]!
-  ): ImageUploadResponse
+  uploadBase64Image(
+    base64_str: String!
+  ): ImageResponse
 }
 
 input SignupInput {
@@ -111,6 +111,10 @@ type PayOutput {
 
 type ImageUploadResponse {
   urls: [String!]
+}
+
+type ImageResponse {
+  url: String!
 }
 
 scalar Upload

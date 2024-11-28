@@ -1,14 +1,7 @@
 table:
   name: users
   schema: public
-array_relationships:
-  - name: bookmarks
-    using:
-      foreign_key_constraint_on:
-        column: user_id
-        table:
-          name: bookmarks
-          schema: public
+object_relationships:
   - name: events
     using:
       manual_configuration:
@@ -17,6 +10,14 @@ array_relationships:
         insertion_order: null
         remote_table:
           name: events
+          schema: public
+array_relationships:
+  - name: bookmarks
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: bookmarks
           schema: public
   - name: followers
     using:
